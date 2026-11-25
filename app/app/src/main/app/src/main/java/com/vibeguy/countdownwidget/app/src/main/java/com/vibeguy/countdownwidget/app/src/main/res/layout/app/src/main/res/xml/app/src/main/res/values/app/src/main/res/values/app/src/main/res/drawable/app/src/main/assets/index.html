@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Countdown Widget Setup</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #0b1120;
+      color: #f8fafc;
+    }
+    h1 { font-size: 20px; margin: 0 0 14px; }
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    label { display: block; font-size: 13px; color: #cbd5e1; margin: 10px 0 6px; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #fff;
+      font-size: 14px;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    .preview-box {
+      border-radius: 18px;
+      padding: 18px;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    .preview-box.has-photo::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,var(--overlay, 0.35));
+    }
+    .preview-content { position: relative; z-index: 1; }
+    .p-title { font-size: 14px; font-weight: 700; }
+    .p-time { font-size: 22px; font-weight: 800; margin: 4px 0; }
+    .p-sub { font-size: 12px; opacity: 0.9; }
+    button {
+      width: 100%;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .btn-primary { background: #38bdf8; color: #082f49; }
+    .btn-secondary { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+    .btn-danger { background: #7f1d1d; color: #fecaca; }
+  </style>
+</head>
+<body>
+  <h1>Countdown Widget Studio</h1>
+
+  <div class="card">
+    <div id="previewBox" class="preview-box">
+      <div class="preview-content">
+        <div id="pTitle" class="p-title">My Countdown</div>
+        <div id="pTime" class="p-time">07d 00h 00m left</div>
+        <div id="pSub" class="p-sub">Target date</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="titleInput">Countdown Title</label>
+    <input id="titleInput" type="text" placeholder="e.g. Exam Day / Trip" />
+
+    <label for="subtitleInput">Subtitle / Note (Optional)</label>
+    <input id="subtitleInput" type="text" placeholder="Leave blank to show target date" />
+
+    <div class="row">
+      <div>
+        <label for="dateInput">Target Date</label>
+        <input id="dateInput" type="date" />
+      </div>
+      <div>
+        <label for="timeInput">Target Time</label>
+        <input id="timeInput" type="time" />
+      </div>
+    </div>
+
+    <label for="formatSelect">Countdown Format</label>
+    <select id="formatSelect">
+      <option value="dhm">Days, Hours, Minutes (7d 12h 30m)</option>
+      <option value="dhms">Days, Hours, Mins, Secs</option>
+      <option value="hms">Total Hours:Minutes:Seconds</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="bgStartInput">Gradient Start</label>
+        <input id="bgStartInput" type="color" value="#0f172a" />
+      </div>
+      <div>
+        <label for="bgEndInput">Gradient End</label>
+        <input id="bgEndInput" type="color" value="#1e293b" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="textColorInput">Title / Sub Color</label>
+        <input id="textColorInput" type="color" value="#ffffff" />
+      </div>
+      <div>
+        <label for="accentColorInput">Timer Color</label>
+        <input id="accentColorInput" type="color" value="#38bdf8" />
+      </div>
+    </div>
+
+    <label for="overlayRange">Dark Overlay Opacity (<span id="overlayVal">35%</span>)</label>
+    <input id="overlayRange" type="range" min="0" max="80" value="35" />
+
+    <button type="button" class="btn-secondary" onclick="pickBgPhoto()">Choose Background Photo</button>
+    <button type="button" class="btn-danger" onclick="clearBgPhoto()">Remove Background Photo</button>
+  </div>
+
+  <button type="button" class="btn-primary" onclick="saveAndFinish()">Save & Apply to Widget</button>
+
+  <script>
+    let bgDataUrl = "";
+    let useWallpaper = false;
+
+    const els = {
+      title: document.getElementById("titleInput"),
+      subtitle: document.getElementById("subtitleInput"),
+      date: document.getElementById("dateInput"),
+      time: document.getElementById("timeInput"),
+      format: document.getElementById("formatSelect"),
+      bgStart: document.getElementById("bgStartInput"),
+      bgEnd: document.getElementById("bgEndInput"),
+      textColor: document.getElementById("textColorInput"),
+      accentColor: document.getElementById("accentColorInput"),
+      overlay: document.getElementById("overlayRange"),
+      overlayVal: document.getElementById("overlayVal"),
+      previewBox: document.getElementById("previewBox"),
+      pTitle: document.getElementById("pTitle"),
+      pTime: document.getElementById("pTime"),
+      pSub: document.getElementById("pSub")
+    };
+
+    function setDefaultDateTime() {
+      const future = new Date(Date.now() + 7 * 86400000);
+      const yyyy = future.getFullYear();
+      const mm = String(future.getMonth() + 1).padStart(2, "0");
+      const dd = String(future.getDate()).padStart(2, "0");
+      const hh = String(future.getHours()).padStart(2, "0");
+      const min = String(future.getMinutes()).padStart(2, "0");
+      els.date.value = `${yyyy}-${mm}-${dd}`;
+      els.time.value = `${hh}:${min}`;
+    }
+
+    function getTargetMillis() {
+      if (!els.date.value) return Date.now() + 7 * 86400000;
+      const timeStr = els.time.value || "00:00";
+      const dt = new Date(`${els.date.value}T${timeStr}:00`);
+      return isNaN(dt.getTime()) ? Date.now() + 7 * 86400000 : dt.getTime();
+    }
+
+    function updatePreview() {
+      const title = els.title.value.trim() || "My Countdown";
+      const target = getTargetMillis();
+      const diff = target - Date.now();
+      const abs = Math.abs(diff);
+
+      const days = Math.floor(abs / 86400000);
+      const hours = Math.floor((abs % 86400000) / 3600000);
+      const mins = Math.floor((abs % 3600000) / 60000);
+      const secs = Math.floor((abs % 60000) / 1000);
+
+      let formatted = `${days}d ${hours}h ${mins}m`;
+      if (els.format.value === "dhms") {
+        formatted = `${String(days).padStart(2,"0")}d ${String(hours).padStart(2,"0")}h ${String(mins).padStart(2,"0")}m ${String(secs).padStart(2,"0")}s`;
+      } else if (els.format.value === "hms") {
+        const totalH = Math.floor(abs / 3600000);
+        formatted = `${String(totalH).padStart(2,"0")}:${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+      }
+
+      els.pTitle.textContent = title;
+      els.pTitle.style.color = els.textColor.value;
+      els.pTime.textContent = formatted + (diff <= 0 ? " (Done)" : " left");
+      els.pTime.style.color = els.accentColor.value;
+
+      const targetDateStr = new Date(target).toLocaleString();
+      els.pSub.textContent = els.subtitle.value.trim() || ("Target: " + targetDateStr);
+      els.pSub.style.color = els.textColor.value;
+
+      const opacityNum = Number(els.overlay.value) / 100;
+      els.overlayVal.textContent = `${els.overlay.value}%`;
+      els.previewBox.style.setProperty("--overlay", String(opacityNum));
+
+      if (useWallpaper && bgDataUrl) {
+        els.previewBox.classList.add("has-photo");
+        els.previewBox.style.backgroundImage = `url("${bgDataUrl}")`;
+      } else {
+        els.previewBox.classList.remove("has-photo");
+        els.previewBox.style.backgroundImage = `linear-gradient(135deg, ${els.bgStart.value}, ${els.bgEnd.value})`;
+      }
+    }
+
+    function pickBgPhoto() {
+      if (window.AndroidBridge && window.AndroidBridge.pickWallpaper) {
+        window.AndroidBridge.pickWallpaper();
+      }
+    }
+
+    function clearBgPhoto() {
+      bgDataUrl = "";
+      useWallpaper = false;
+      if (window.AndroidBridge && window.AndroidBridge.clearWallpaper) {
+        window.AndroidBridge.clearWallpaper();
+      }
+      updatePreview();
+    }
+
+    window.onNativeImagePicked = function(dataUrl) {
+      if (dataUrl) {
+        bgDataUrl = dataUrl;
+        useWallpaper = true;
+        updatePreview();
+      }
+    };
+
+    function saveAndFinish() {
+      const cfg = {
+        title: els.title.value.trim() || "My Countdown",
+        subtitle: els.subtitle.value.trim(),
+        targetMillis: getTargetMillis(),
+        formatMode: els.format.value,
+        bgStartColor: els.bgStart.value,
+        bgEndColor: els.bgEnd.value,
+        textColor: els.textColor.value,
+        accentColor: els.accentColor.value,
+        overlayOpacity: Number(els.overlay.value) / 100,
+        useWallpaper: useWallpaper
+      };
+      if (window.AndroidBridge && window.AndroidBridge.saveConfig) {
+        window.AndroidBridge.saveConfig(JSON.stringify(cfg));
+      }
+      if (window.AndroidBridge && window.AndroidBridge.finishWidgetSetup) {
+        window.AndroidBridge.finishWidgetSetup();
+      }
+    }
+
+    function loadSaved() {
+      setDefaultDateTime();
+      if (window.AndroidBridge && window.AndroidBridge.loadConfig) {
+        const raw = window.AndroidBridge.loadConfig();
+        if (raw) {
+          try {
+            const cfg = JSON.parse(raw);
+            els.title.value = cfg.title || "";
+            els.subtitle.value = cfg.subtitle || "";
+            if (cfg.targetMillis) {
+              const dt = new Date(cfg.targetMillis);
+              if (!isNaN(dt.getTime())) {
+                els.date.value = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+                els.time.value = `${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`;
+              }
+            }
+            if (cfg.formatMode) els.format.value = cfg.formatMode;
+            if (cfg.bgStartColor) els.bgStart.value = cfg.bgStartColor;
+            if (cfg.bgEndColor) els.bgEnd.value = cfg.bgEndColor;
+            if (cfg.textColor) els.textColor.value = cfg.textColor;
+            if (cfg.accentColor) els.accentColor.value = cfg.accentColor;
+            if (typeof cfg.overlayOpacity === "number") {
+              els.overlay.value = String(Math.round(cfg.overlayOpacity * 100));
+            }
+            useWallpaper = Boolean(cfg.useWallpaper);
+          } catch (_) {}
+        }
+      }
+      updatePreview();
+    }
+
+    [els.title, els.subtitle, els.date, els.time, els.format, els.bgStart, els.bgEnd, els.textColor, els.accentColor, els.overlay]
+      .forEach(el => el.addEventListener("input", updatePreview));
+
+    loadSaved();
+    setInterval(updatePreview, 1000);
+  </script>
+</body>
+</html>
